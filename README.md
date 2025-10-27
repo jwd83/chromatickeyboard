@@ -1,5 +1,7 @@
 # Chromatic Keyboard
 
+**[🎹 Play it live!](https://jwd83.github.io/chromatickeyboard/)**
+
 A web application that transforms your computer keyboard into a chromatic musical instrument. Upload any audio sample and play it across three octaves using your keyboard!
 
 ## Features
