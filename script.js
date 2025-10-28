@@ -4,7 +4,7 @@ let sampleBuffer;
 
 // Current mode
 let currentMode = 'scale'; // 'scale' or 'chord'
-let fadeOutMode = false; // Whether to fade out previous notes when new ones play
+let fadeOutMode = true; // Whether to fade out previous notes when new ones play
 
 // Track active audio sources for fade-out
 let activeSources = [];
