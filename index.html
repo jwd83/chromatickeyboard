@@ -10,13 +10,13 @@
     <header>
         <h1>Chromatic Keyboard</h1>
     </header>
-    
+
     <main>
         <div class="upload-section">
             <label for="audio-file" class="upload-button">Load Sound File</label>
             <input type="file" id="audio-file" accept="audio/*" hidden>
             <p id="file-status">No file loaded</p>
-            
+
             <div class="mode-selector">
                 <label for="mode-select">Mode:</label>
                 <select id="mode-select">
@@ -24,15 +24,20 @@
                     <option value="chord">Chord Mode (I-V-vi-IV)</option>
                 </select>
             </div>
+
+            <!-- find sounds at https://pixabay.com/sound-effects/search/ -->
+            <div class="find-sounds">
+                <a href="https://pixabay.com/sound-effects/search/" target="_blank" rel="noopener">Find free sfx at pixbay</a>
+            </div>
         </div>
 
         <div id="keyboard-container">
             <div class="octave-label">Octave Up (C5-B5)</div>
             <div id="keyboard-high" class="keyboard-row"></div>
-            
+
             <div class="octave-label">Root Octave (C4-B4)</div>
             <div id="keyboard-mid" class="keyboard-row"></div>
-            
+
             <div class="octave-label">Octave Down (C3-B3)</div>
             <div id="keyboard-low" class="keyboard-row"></div>
         </div>
