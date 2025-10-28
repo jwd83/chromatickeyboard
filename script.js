@@ -199,7 +199,7 @@ async function handleFileUpload(event) {
 }
 
 // Play a note with given semitone offset
-function playNote(semitoneOffset) {
+function playNote(semitoneOffset, volumeScale = 1.0) {
     if (!sampleBuffer || !audioContext) return;
     
     try {
@@ -214,7 +214,7 @@ function playNote(semitoneOffset) {
         
         // Create gain node for volume control
         const gainNode = audioContext.createGain();
-        gainNode.gain.value = 1.0;
+        gainNode.gain.value = volumeScale;
         
         // Connect source -> gain -> destination
         source.connect(gainNode);
@@ -267,9 +267,13 @@ function fadeOutActiveSounds() {
 function playChord(semitoneOffsets) {
     if (!sampleBuffer || !audioContext) return;
     
-    // Play each note in the chord
+    // Reduce volume per note to prevent clipping when stacking
+    // Each note in a 3-note chord gets 1/3 volume (0.33)
+    const volumePerNote = 1.0 / semitoneOffsets.length;
+    
+    // Play each note in the chord with reduced volume
     semitoneOffsets.forEach(offset => {
-        playNote(offset);
+        playNote(offset, volumePerNote);
     });
 }
 
