@@ -68,6 +68,41 @@ main {
     font-size: 0.9rem;
 }
 
+.mode-selector {
+    margin-top: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.mode-selector label {
+    font-weight: 600;
+    color: #666;
+}
+
+#mode-select {
+    padding: 0.5rem 1rem;
+    border: 2px solid #667eea;
+    border-radius: 8px;
+    background: white;
+    color: #333;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+#mode-select:hover {
+    border-color: #764ba2;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+#mode-select:focus {
+    outline: none;
+    border-color: #764ba2;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+}
+
 #keyboard-container {
     background: rgba(255, 255, 255, 0.95);
     padding: 2rem;

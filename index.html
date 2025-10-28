@@ -16,6 +16,14 @@
             <label for="audio-file" class="upload-button">Load Sound File</label>
             <input type="file" id="audio-file" accept="audio/*" hidden>
             <p id="file-status">No file loaded</p>
+            
+            <div class="mode-selector">
+                <label for="mode-select">Mode:</label>
+                <select id="mode-select">
+                    <option value="scale">Scale Mode</option>
+                    <option value="chord">Chord Mode (I-V-vi-IV)</option>
+                </select>
+            </div>
         </div>
 
         <div id="keyboard-container">
@@ -31,7 +39,8 @@
 
         <div class="instructions">
             <p>Upload an audio sample, then use your keyboard to play music!</p>
-            <p>C major scale: <strong>A S D F J K L ;</strong> (root), <strong>Q W E R U I O P</strong> (high), <strong>Z X C V M , . /</strong> (low)</p>
+            <p id="scale-instructions">C major scale: <strong>A S D F J K L ;</strong> (root), <strong>Q W E R U I O P</strong> (high), <strong>Z X C V M , . /</strong> (low)</p>
+            <p id="chord-instructions" style="display: none;">Chord progression (I-V-vi-IV): <strong>A S D F</strong> = C-G-Am-F (root), <strong>J K L ;</strong> = C-G-Am-F (+1 oct), <strong>Q W E R</strong> and <strong>U I O P</strong> (higher), <strong>Z X C V</strong> and <strong>M , . /</strong> (lower)</p>
         </div>
     </main>
 
