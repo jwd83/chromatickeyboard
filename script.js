@@ -4,6 +4,10 @@ let sampleBuffer;
 
 // Current mode
 let currentMode = 'scale'; // 'scale' or 'chord'
+let fadeOutMode = false; // Whether to fade out previous notes when new ones play
+
+// Track active audio sources for fade-out
+let activeSources = [];
 
 // Keyboard mapping: key -> semitone offset from root (C4)
 // C major scale: C D E F G A B C (full octave)
@@ -61,6 +65,7 @@ const keyboardHigh = document.getElementById('keyboard-high');
 const keyboardMid = document.getElementById('keyboard-mid');
 const keyboardLow = document.getElementById('keyboard-low');
 const modeSelect = document.getElementById('mode-select');
+const fadeOutToggle = document.getElementById('fade-out-toggle');
 
 // Initialize the app
 function init() {
@@ -72,6 +77,9 @@ function init() {
     
     // Set up mode selector
     modeSelect.addEventListener('change', handleModeChange);
+    
+    // Set up fade-out toggle
+    fadeOutToggle.addEventListener('change', handleFadeOutToggle);
     
     // Set up keyboard event listeners
     window.addEventListener('keydown', handleKeyDown);
@@ -94,6 +102,11 @@ function handleModeChange(event) {
         scaleInstructions.style.display = 'none';
         chordInstructions.style.display = 'block';
     }
+}
+
+// Handle fade-out toggle
+function handleFadeOutToggle(event) {
+    fadeOutMode = event.target.checked;
 }
 
 // Create the visual keyboard elements
@@ -199,13 +212,55 @@ function playNote(semitoneOffset) {
         const playbackRate = Math.pow(2, semitoneOffset / 12);
         source.playbackRate.value = playbackRate;
         
-        // Connect to output and play
-        source.connect(audioContext.destination);
+        // Create gain node for volume control
+        const gainNode = audioContext.createGain();
+        gainNode.gain.value = 1.0;
+        
+        // Connect source -> gain -> destination
+        source.connect(gainNode);
+        gainNode.connect(audioContext.destination);
         source.start(0);
+        
+        // Store reference for potential fade-out
+        const sourceInfo = { source, gainNode, startTime: audioContext.currentTime };
+        activeSources.push(sourceInfo);
+        
+        // Clean up when sound finishes
+        source.onended = () => {
+            const index = activeSources.indexOf(sourceInfo);
+            if (index > -1) {
+                activeSources.splice(index, 1);
+            }
+        };
         
     } catch (error) {
         console.error('Error playing note:', error);
     }
+}
+
+// Fade out all currently playing sounds
+function fadeOutActiveSounds() {
+    const currentTime = audioContext.currentTime;
+    const fadeTime = 0.1; // 100ms fade out
+    
+    activeSources.forEach(({ source, gainNode, startTime }) => {
+        try {
+            // Only fade if the sound has been playing for at least a tiny bit
+            if (currentTime - startTime > 0.01) {
+                gainNode.gain.cancelScheduledValues(currentTime);
+                gainNode.gain.setValueAtTime(gainNode.gain.value, currentTime);
+                gainNode.gain.linearRampToValueAtTime(0, currentTime + fadeTime);
+                
+                // Stop the source after fade completes
+                source.stop(currentTime + fadeTime);
+            }
+        } catch (error) {
+            // Source might already be stopped, that's okay
+        }
+    });
+    
+    // Clear the array since we're fading them all out
+    activeSources = [];
 }
 
 // Play a chord (multiple notes)
@@ -234,6 +289,11 @@ function handleKeyDown(event) {
     
     // Mark key as active
     activeKeys.add(key);
+    
+    // Fade out previous sounds if fade-out mode is enabled
+    if (fadeOutMode) {
+        fadeOutActiveSounds();
+    }
     
     // Play the note or chord
     if (currentMode === 'scale') {
