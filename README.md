@@ -8,17 +8,30 @@ A web application that transforms your computer keyboard into a chromatic musica
 
 - 🎹 **Three Octave Range**: Play notes across C3 to B5
 - 🎵 **Any Sound Sample**: Upload any audio file (.wav, .mp3, .ogg) as your instrument
-- ⌨️ **Keyboard Mapping**: Use QWERTY keyboard rows for intuitive playing
+- ⌨️ **Two Play Modes**:
+  - **Scale Mode**: C major scale laid out across three QWERTY rows
+  - **Chord Mode**: I–V–vi–IV progression ("four chord song") across multiple octaves
+- 🔁 **Loop Recorder**: Record what you play and loop it hands-free
+- 🔉 **Output Safety**: Per-note gain, optional fade-out, and a master limiter to tame clipping
 - 👀 **Visual Feedback**: See which keys are active as you play
-- 🎼 **Real-time Audio**: Low-latency playback using Web Audio API
+- 🎼 **Real-time Audio**: Low-latency playback using the Web Audio API
 
 ## How to Use
 
-1. **Load a Sound File**: Click "Load Sound File" and select an audio file from your computer
-2. **Play Music**: Use your keyboard to play notes in C major scale (full octave):
-   - **Q W E R U I O P**: Octave Up (C5-C6)
-   - **A S D F J K L ;**: Root Octave (C4-C5)
-   - **Z X C V M , . /**: Octave Down (C3-C4)
+1. **Load a Sound File**: Click "Load Sound File" and select an audio file from your computer.
+2. **Choose a Mode** using the **Mode** dropdown:
+   - **Scale Mode** – play the C major scale across the rows
+   - **Chord Mode** – trigger I–V–vi–IV chords instead of single notes
+3. **Play the Keyboard** (C major scale layout in Scale Mode):
+   - **Q W E R U I O P**: Octave Up (C5–C6)
+   - **A S D F J K L ;**: Root Octave (C4–C5)
+   - **Z X C V M , . /**: Octave Down (C3–C4)
+4. **Tweak the Sound**:
+   - Toggle **Fade Out Previous Notes** to choose between hard-cut and smoother transitions
+   - The master limiter automatically reduces peaks when many notes/chords stack
+5. **Use the Loop Recorder**:
+   - Click **Record**, play on the keyboard, then click **Stop Recording**
+   - Click **Play Loop** to start looping; **Stop Loop** to stop; **Clear Loop** to erase
 
 ## Keyboard Layout
 
@@ -36,8 +49,11 @@ C  D  E  F     G  A  B  C
 ## Technical Details
 
 - **Frontend**: Vanilla HTML5, CSS3, and JavaScript (ES6+)
-- **Audio Engine**: Web Audio API for audio decoding and pitch shifting
+- **Audio Engine**: Web Audio API for audio decoding, pitch shifting, and mixing
 - **Pitch Shifting**: Uses playback rate manipulation (2^(semitones/12))
+- **Chords**: Each chord is built from the same sample using per-note playback rate and reduced per-note gain
+- **Master Limiter**: Global gain + `DynamicsCompressorNode` reduce clipping when many sources play at once
+- **Loop Recorder**: Captures key events with timestamps and replays them in a timed loop
 
 ## Local Development
 
@@ -73,6 +89,7 @@ Works in all modern browsers that support the Web Audio API:
 
 - Pitch shifting via playback rate changes both pitch and duration (chipmunk effect for higher notes)
 - Latency may vary depending on browser and system performance
+- The master limiter helps, but extreme input levels or many overlapping notes can still pump or distort slightly
 
 ## Future Enhancements
 

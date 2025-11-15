@@ -222,6 +222,55 @@ main {
     margin-bottom: 0;
 }
 
+.loop-controls {
+    background: rgba(255, 255, 255, 0.95);
+    padding: 1.5rem;
+    border-radius: 12px;
+    margin-top: 1.5rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.loop-controls h2 {
+    margin-bottom: 1rem;
+    font-size: 1.2rem;
+    color: #333;
+}
+
+.loop-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+    margin-bottom: 0.75rem;
+}
+
+.loop-buttons button {
+    padding: 0.4rem 0.8rem;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    background: #667eea;
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: background 0.2s, transform 0.1s;
+}
+
+.loop-buttons button:hover:enabled {
+    background: #764ba2;
+    transform: translateY(-1px);
+}
+
+.loop-buttons button:disabled {
+    background: #ccc;
+    cursor: default;
+}
+
+#loop-status {
+    font-size: 0.85rem;
+    color: #666;
+}
+
 @media (max-width: 768px) {
     .key {
         flex: 0 0 60px;

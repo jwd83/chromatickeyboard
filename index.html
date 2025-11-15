@@ -55,6 +55,18 @@
             <p id="scale-instructions">C major scale: <strong>A S D F J K L ;</strong> (root), <strong>Q W E R U I O P</strong> (high), <strong>Z X C V M , . /</strong> (low)</p>
             <p id="chord-instructions" style="display: none;">Chord progression (I-V-vi-IV): <strong>A S D F</strong> = C-G-Am-F (root), <strong>J K L ;</strong> = C-G-Am-F (+1 oct), <strong>Q W E R</strong> and <strong>U I O P</strong> (higher), <strong>Z X C V</strong> and <strong>M , . /</strong> (lower)</p>
         </div>
+
+        <div class="loop-controls">
+            <h2>Loop Recorder</h2>
+            <div class="loop-buttons">
+                <button id="loop-record-btn">Record</button>
+                <button id="loop-stop-record-btn" disabled>Stop Recording</button>
+                <button id="loop-play-btn" disabled>Play Loop</button>
+                <button id="loop-stop-loop-btn" disabled>Stop Loop</button>
+                <button id="loop-clear-btn" disabled>Clear Loop</button>
+            </div>
+            <p id="loop-status">No loop recorded.</p>
+        </div>
     </main>
 
     <script src="script.js" defer></script>

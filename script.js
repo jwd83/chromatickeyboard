@@ -2,6 +2,10 @@
 let audioContext;
 let sampleBuffer;
 
+// Master output chain
+let masterGain;
+let masterCompressor;
+
 // Current mode
 let currentMode = 'scale'; // 'scale' or 'chord'
 let fadeOutMode = true; // Whether to fade out previous notes when new ones play
@@ -58,6 +62,14 @@ const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 
 // Track which keys are currently pressed
 const activeKeys = new Set();
 
+// Loop recording state
+let isRecording = false;
+let isLooping = false;
+let recordingStartTime = null;
+let recordedEvents = [];
+let loopLength = 0;
+let loopTimeoutId = null;
+
 // DOM elements
 const fileInput = document.getElementById('audio-file');
 const fileStatus = document.getElementById('file-status');
@@ -66,6 +78,14 @@ const keyboardMid = document.getElementById('keyboard-mid');
 const keyboardLow = document.getElementById('keyboard-low');
 const modeSelect = document.getElementById('mode-select');
 const fadeOutToggle = document.getElementById('fade-out-toggle');
+
+// Loop controls
+const loopRecordBtn = document.getElementById('loop-record-btn');
+const loopStopRecordBtn = document.getElementById('loop-stop-record-btn');
+const loopPlayBtn = document.getElementById('loop-play-btn');
+const loopStopBtn = document.getElementById('loop-stop-loop-btn');
+const loopClearBtn = document.getElementById('loop-clear-btn');
+const loopStatus = document.getElementById('loop-status');
 
 // Initialize the app
 function init() {
@@ -80,6 +100,15 @@ function init() {
     
     // Set up fade-out toggle
     fadeOutToggle.addEventListener('change', handleFadeOutToggle);
+
+    // Set up loop controls
+    if (loopRecordBtn && loopStopRecordBtn && loopPlayBtn && loopStopBtn && loopClearBtn) {
+        loopRecordBtn.addEventListener('click', startRecordingLoop);
+        loopStopRecordBtn.addEventListener('click', stopRecordingLoop);
+        loopPlayBtn.addEventListener('click', startLoopPlayback);
+        loopStopBtn.addEventListener('click', stopLoopPlayback);
+        loopClearBtn.addEventListener('click', clearLoop);
+    }
     
     // Set up keyboard event listeners
     window.addEventListener('keydown', handleKeyDown);
@@ -107,6 +136,131 @@ function handleModeChange(event) {
 // Handle fade-out toggle
 function handleFadeOutToggle(event) {
     fadeOutMode = event.target.checked;
+}
+
+// Loop recorder helpers
+function updateLoopStatus(text) {
+    if (loopStatus) {
+        loopStatus.textContent = text;
+    }
+}
+
+function updateLoopButtons() {
+    if (!loopRecordBtn || !loopStopRecordBtn || !loopPlayBtn || !loopStopBtn || !loopClearBtn) return;
+
+    loopRecordBtn.disabled = isRecording;
+    loopStopRecordBtn.disabled = !isRecording;
+    loopPlayBtn.disabled = isRecording || recordedEvents.length === 0 || isLooping;
+    loopStopBtn.disabled = !isLooping;
+    loopClearBtn.disabled = isRecording || recordedEvents.length === 0;
+}
+
+function startRecordingLoop() {
+    if (!audioContext) {
+        // Require audio to be initialized (user must have loaded a sample first)
+        updateLoopStatus('Load a sound file before recording a loop.');
+        return;
+    }
+
+    isRecording = true;
+    isLooping = false;
+    recordedEvents = [];
+    loopLength = 0;
+    if (loopTimeoutId) {
+        clearTimeout(loopTimeoutId);
+        loopTimeoutId = null;
+    }
+
+    recordingStartTime = audioContext.currentTime;
+    updateLoopStatus('Recording loop... Play on your keyboard, then press Stop Recording.');
+    updateLoopButtons();
+}
+
+function stopRecordingLoop() {
+    isRecording = false;
+
+    if (recordedEvents.length === 0) {
+        updateLoopStatus('No events recorded.');
+        updateLoopButtons();
+        return;
+    }
+
+    const lastEvent = recordedEvents[recordedEvents.length - 1];
+    loopLength = Math.max(lastEvent.timeOffset + 0.1, 0.1);
+
+    updateLoopStatus(`Recorded loop of length ${loopLength.toFixed(2)}s. Press Play Loop to start looping.`);
+    updateLoopButtons();
+}
+
+function clearLoop() {
+    isRecording = false;
+    isLooping = false;
+    recordedEvents = [];
+    loopLength = 0;
+    if (loopTimeoutId) {
+        clearTimeout(loopTimeoutId);
+        loopTimeoutId = null;
+    }
+
+    updateLoopStatus('Loop cleared.');
+    updateLoopButtons();
+}
+
+function scheduleLoopIteration() {
+    if (!audioContext || recordedEvents.length === 0) return;
+
+    recordedEvents.forEach(event => {
+        const delayMs = event.timeOffset * 1000;
+        setTimeout(() => {
+            if (!isLooping) return;
+
+            // Apply same fade-out behavior as live playing if enabled
+            if (fadeOutMode) {
+                fadeOutActiveSounds();
+            }
+
+            if (event.mode === 'scale') {
+                playNote(SCALE_MAP[event.key]);
+            } else if (event.mode === 'chord') {
+                playChord(CHORD_MAP[event.key]);
+            }
+        }, delayMs);
+    });
+}
+
+function startLoopPlayback() {
+    if (!audioContext || recordedEvents.length === 0 || loopLength <= 0) {
+        updateLoopStatus('No loop to play. Record a loop first.');
+        return;
+    }
+
+    isLooping = true;
+    updateLoopButtons();
+
+    scheduleLoopIteration();
+
+    function scheduleNext() {
+        if (!isLooping) return;
+        loopTimeoutId = setTimeout(() => {
+            if (!isLooping) return;
+            scheduleLoopIteration();
+            scheduleNext();
+        }, loopLength * 1000);
+    }
+
+    scheduleNext();
+    updateLoopStatus('Loop playing. Press Stop Loop to stop.');
+}
+
+function stopLoopPlayback() {
+    isLooping = false;
+    if (loopTimeoutId) {
+        clearTimeout(loopTimeoutId);
+        loopTimeoutId = null;
+    }
+
+    updateLoopStatus('Loop stopped.');
+    updateLoopButtons();
 }
 
 // Create the visual keyboard elements
@@ -175,6 +329,22 @@ async function handleFileUpload(event) {
             audioContext = new AudioContext();
         }
         
+        // Set up master gain and compressor once
+        if (!masterGain) {
+            masterGain = audioContext.createGain();
+            masterGain.gain.value = 0.8; // leave some headroom
+
+            masterCompressor = audioContext.createDynamicsCompressor();
+            masterCompressor.threshold.setValueAtTime(-18, audioContext.currentTime);
+            masterCompressor.knee.setValueAtTime(30, audioContext.currentTime);
+            masterCompressor.ratio.setValueAtTime(6, audioContext.currentTime);
+            masterCompressor.attack.setValueAtTime(0.003, audioContext.currentTime);
+            masterCompressor.release.setValueAtTime(0.25, audioContext.currentTime);
+
+            masterGain.connect(masterCompressor);
+            masterCompressor.connect(audioContext.destination);
+        }
+        
         // Resume audio context if suspended
         if (audioContext.state === 'suspended') {
             await audioContext.resume();
@@ -216,9 +386,13 @@ function playNote(semitoneOffset, volumeScale = 1.0) {
         const gainNode = audioContext.createGain();
         gainNode.gain.value = volumeScale;
         
-        // Connect source -> gain -> destination
+        // Connect source -> gain -> master/output
         source.connect(gainNode);
-        gainNode.connect(audioContext.destination);
+        if (masterGain) {
+            gainNode.connect(masterGain);
+        } else {
+            gainNode.connect(audioContext.destination);
+        }
         source.start(0);
         
         // Store reference for potential fade-out
@@ -304,6 +478,21 @@ function handleKeyDown(event) {
         playNote(SCALE_MAP[key]);
     } else {
         playChord(CHORD_MAP[key]);
+    }
+
+    // If recording, store this event relative to recording start
+    if (isRecording && audioContext) {
+        if (recordingStartTime === null) {
+            recordingStartTime = audioContext.currentTime;
+        }
+        const timeOffset = audioContext.currentTime - recordingStartTime;
+        recordedEvents.push({
+            timeOffset,
+            mode: currentMode,
+            key,
+        });
+        updateLoopStatus('Recording loop...');
+        updateLoopButtons();
     }
     
     // Add visual feedback
