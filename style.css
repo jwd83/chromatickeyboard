@@ -137,6 +137,68 @@ main {
     font-style: italic;
 }
 
+.voices-panel {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #eee;
+    text-align: left;
+}
+
+.voices-panel h2 {
+    font-size: 1.1rem;
+    margin-bottom: 0.75rem;
+    color: #333;
+}
+
+.voices-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.voice-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.35rem 0.6rem;
+    border-radius: 8px;
+    background: #f6f7ff;
+}
+
+.voice-item.active {
+    background: #e2e6ff;
+    border: 1px solid #667eea;
+}
+
+.voice-select {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    cursor: pointer;
+    color: #333;
+}
+
+.voice-remove {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    font-size: 1rem;
+    cursor: pointer;
+    color: #999;
+}
+
+.voice-remove:hover {
+    color: #c0392b;
+}
+
+.voices-empty {
+    font-size: 0.85rem;
+    color: #777;
+}
+
 #keyboard-container {
     background: rgba(255, 255, 255, 0.95);
     padding: 2rem;

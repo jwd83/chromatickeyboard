@@ -12,6 +12,7 @@ A web application that transforms your computer keyboard into a chromatic musica
   - **Scale Mode**: C major scale laid out across three QWERTY rows
   - **Chord Mode**: I–V–vi–IV progression ("four chord song") across multiple octaves
 - 🔁 **Loop Recorder**: Record what you play and loop it hands-free
+- 🎛️ **Multiple Voices**: Load several sound files and switch between them on the fly
 - 🔉 **Output Safety**: Per-note gain, optional fade-out, and a master limiter to tame clipping
 - 👀 **Visual Feedback**: See which keys are active as you play
 - 🎼 **Real-time Audio**: Low-latency playback using the Web Audio API
@@ -29,9 +30,13 @@ A web application that transforms your computer keyboard into a chromatic musica
 4. **Tweak the Sound**:
    - Toggle **Fade Out Previous Notes** to choose between hard-cut and smoother transitions
    - The master limiter automatically reduces peaks when many notes/chords stack
-5. **Use the Loop Recorder**:
+5. **Manage Voices**:
+   - Load multiple sounds using **Load Sound File**; each load adds a new voice
+   - Use the **Voices** list to select the active voice or remove voices you no longer want
+6. **Use the Loop Recorder**:
    - Click **Record**, play on the keyboard, then click **Stop Recording**
    - Click **Play Loop** to start looping; **Stop Loop** to stop; **Clear Loop** to erase
+   - Loops remember which mode, voice, and fade-out setting were used when they were recorded
 
 ## Keyboard Layout
 

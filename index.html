@@ -13,8 +13,8 @@
 
     <main>
         <div class="upload-section">
-            <label for="audio-file" class="upload-button">Load Sound File</label>
-            <input type="file" id="audio-file" accept="audio/*" hidden>
+            <label for="audio-file" class="upload-button">Load Sound File(s)</label>
+            <input type="file" id="audio-file" accept="audio/*" multiple hidden>
             <p id="file-status">No file loaded</p>
 
             <div class="mode-selector">
@@ -31,6 +31,13 @@
                     Fade Out Previous Notes
                 </label>
                 <p class="control-description">Enable to prevent clipping when playing overlapping notes</p>
+            </div>
+
+            <div class="voices-panel">
+                <h2>Voices</h2>
+                <div id="voices-list" class="voices-list">
+                    <p class="voices-empty">No voices loaded. Use "Load Sound File" to add one or more sounds.</p>
+                </div>
             </div>
 
             <!-- find sounds at https://pixabay.com/sound-effects/search/ -->

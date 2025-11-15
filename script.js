@@ -2,6 +2,11 @@
 let audioContext;
 let sampleBuffer;
 
+// Multiple voices (samples)
+let voices = [];
+let currentVoiceId = null;
+let nextVoiceId = 1;
+
 // Master output chain
 let masterGain;
 let masterCompressor;
@@ -78,6 +83,7 @@ const keyboardMid = document.getElementById('keyboard-mid');
 const keyboardLow = document.getElementById('keyboard-low');
 const modeSelect = document.getElementById('mode-select');
 const fadeOutToggle = document.getElementById('fade-out-toggle');
+const voicesList = document.getElementById('voices-list');
 
 // Loop controls
 const loopRecordBtn = document.getElementById('loop-record-btn');
@@ -109,6 +115,11 @@ function init() {
         loopStopBtn.addEventListener('click', stopLoopPlayback);
         loopClearBtn.addEventListener('click', clearLoop);
     }
+
+    // Set up voices list interactions
+    if (voicesList) {
+        voicesList.addEventListener('click', handleVoicesListClick);
+    }
     
     // Set up keyboard event listeners
     window.addEventListener('keydown', handleKeyDown);
@@ -136,6 +147,75 @@ function handleModeChange(event) {
 // Handle fade-out toggle
 function handleFadeOutToggle(event) {
     fadeOutMode = event.target.checked;
+}
+
+// Voice management helpers
+function renderVoices() {
+    if (!voicesList) return;
+
+    voicesList.innerHTML = '';
+
+    if (voices.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'voices-empty';
+        empty.textContent = 'No voices loaded. Use "Load Sound File" to add one or more sounds.';
+        voicesList.appendChild(empty);
+        return;
+    }
+
+    voices.forEach(voice => {
+        const item = document.createElement('div');
+        item.className = 'voice-item' + (voice.id === currentVoiceId ? ' active' : '');
+        item.dataset.voiceId = String(voice.id);
+
+        item.innerHTML = `
+            <button class="voice-select" type="button">${voice.name}</button>
+            <button class="voice-remove" type="button" aria-label="Remove voice">&times;</button>
+        `;
+
+        voicesList.appendChild(item);
+    });
+}
+
+function addVoice(name, buffer) {
+    const id = nextVoiceId++;
+    voices.push({ id, name, buffer });
+    currentVoiceId = id;
+    sampleBuffer = buffer;
+    renderVoices();
+}
+
+function handleVoicesListClick(event) {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+
+    const item = target.closest('.voice-item');
+    if (!item) return;
+
+    const id = Number(item.dataset.voiceId);
+    const voice = voices.find(v => v.id === id);
+    if (!voice) return;
+
+    if (target.classList.contains('voice-remove')) {
+        // Remove voice
+        voices = voices.filter(v => v.id !== id);
+        if (currentVoiceId === id) {
+            if (voices.length > 0) {
+                const newCurrent = voices[voices.length - 1];
+                currentVoiceId = newCurrent.id;
+                sampleBuffer = newCurrent.buffer;
+            } else {
+                currentVoiceId = null;
+                sampleBuffer = null;
+            }
+        }
+        renderVoices();
+    } else if (target.classList.contains('voice-select')) {
+        // Select voice
+        currentVoiceId = id;
+        sampleBuffer = voice.buffer;
+        renderVoices();
+    }
 }
 
 // Loop recorder helpers
@@ -214,15 +294,15 @@ function scheduleLoopIteration() {
         setTimeout(() => {
             if (!isLooping) return;
 
-            // Apply same fade-out behavior as live playing if enabled
-            if (fadeOutMode) {
+            // Apply fade-out behavior based on how the loop was recorded
+            if (event.fadeOutModeAtRecord) {
                 fadeOutActiveSounds();
             }
 
             if (event.mode === 'scale') {
-                playNote(SCALE_MAP[event.key]);
+                playNote(SCALE_MAP[event.key], 1.0, event.buffer);
             } else if (event.mode === 'chord') {
-                playChord(CHORD_MAP[event.key]);
+                playChord(CHORD_MAP[event.key], event.buffer);
             }
         }, delayMs);
     });
@@ -320,8 +400,8 @@ function createVisualKeyboard() {
 
 // Handle file upload
 async function handleFileUpload(event) {
-    const file = event.target.files[0];
-    if (!file) return;
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
     
     try {
         // Initialize AudioContext on user interaction (browser autoplay policy)
@@ -350,32 +430,45 @@ async function handleFileUpload(event) {
             await audioContext.resume();
         }
         
-        fileStatus.textContent = `Loading ${file.name}...`;
-        
-        // Read the file as an ArrayBuffer
-        const arrayBuffer = await file.arrayBuffer();
-        
-        // Decode the audio data
-        sampleBuffer = await audioContext.decodeAudioData(arrayBuffer);
-        
-        fileStatus.textContent = `✓ Loaded: ${file.name}`;
-        fileStatus.style.color = '#4CAF50';
+        const label = files.length === 1 ? files[0].name : `${files.length} files`;
+        fileStatus.textContent = `Loading ${label}...`;
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const buffer = await audioContext.decodeAudioData(arrayBuffer);
+                addVoice(file.name, buffer);
+            } catch (fileError) {
+                console.error('Error loading audio file:', file.name, fileError);
+            }
+        }
+
+        if (voices.length > 0) {
+            const countLabel = files.length === 1 ? files[0].name : `${files.length} files`;
+            fileStatus.textContent = `✓ Loaded: ${countLabel}`;
+            fileStatus.style.color = '#4CAF50';
+        } else {
+            fileStatus.textContent = 'No valid audio files loaded.';
+            fileStatus.style.color = '#f44336';
+        }
         
     } catch (error) {
-        console.error('Error loading audio file:', error);
-        fileStatus.textContent = `Error loading file. Please try a different audio file.`;
+        console.error('Error loading audio file(s):', error);
+        fileStatus.textContent = `Error loading file(s). Please try different audio files.`;
         fileStatus.style.color = '#f44336';
     }
 }
 
 // Play a note with given semitone offset
-function playNote(semitoneOffset, volumeScale = 1.0) {
-    if (!sampleBuffer || !audioContext) return;
+function playNote(semitoneOffset, volumeScale = 1.0, bufferOverride = null) {
+    const buffer = bufferOverride || sampleBuffer;
+    if (!buffer || !audioContext) return;
     
     try {
         // Create a new buffer source for each note
         const source = audioContext.createBufferSource();
-        source.buffer = sampleBuffer;
+        source.buffer = buffer;
         
         // Calculate playback rate for pitch shifting
         // Formula: 2^(semitones / 12)
@@ -438,16 +531,15 @@ function fadeOutActiveSounds() {
 }
 
 // Play a chord (multiple notes)
-function playChord(semitoneOffsets) {
-    if (!sampleBuffer || !audioContext) return;
+function playChord(semitoneOffsets, bufferOverride = null) {
+    if (!audioContext) return;
     
     // Reduce volume per note to prevent clipping when stacking
-    // Each note in a 3-note chord gets 1/3 volume (0.33)
     const volumePerNote = 1.0 / semitoneOffsets.length;
     
     // Play each note in the chord with reduced volume
     semitoneOffsets.forEach(offset => {
-        playNote(offset, volumePerNote);
+        playNote(offset, volumePerNote, bufferOverride);
     });
 }
 
@@ -490,6 +582,8 @@ function handleKeyDown(event) {
             timeOffset,
             mode: currentMode,
             key,
+            buffer: sampleBuffer,
+            fadeOutModeAtRecord: fadeOutMode,
         });
         updateLoopStatus('Recording loop...');
         updateLoopButtons();
