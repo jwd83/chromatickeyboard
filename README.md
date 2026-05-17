@@ -13,6 +13,7 @@ A web application that transforms your computer keyboard into a chromatic musica
   - **Chord Mode**: I–V–vi–IV progression ("four chord song") across multiple octaves
 - 🔁 **Loop Recorder**: Record what you play and loop it hands-free
 - 🎛️ **Multiple Voices**: Load several sound files and switch between them on the fly
+- 📦 **Sample Export**: Download a ZIP of rendered WAV samples for the selected voice and mode
 - 🔉 **Output Safety**: Per-note gain, optional fade-out, and a master limiter to tame clipping
 - 👀 **Visual Feedback**: See which keys are active as you play
 - 🎼 **Real-time Audio**: Low-latency playback using the Web Audio API
@@ -33,7 +34,10 @@ A web application that transforms your computer keyboard into a chromatic musica
 5. **Manage Voices**:
    - Load multiple sounds using **Load Sound File**; each load adds a new voice
    - Use the **Voices** list to select the active voice or remove voices you no longer want
-6. **Use the Loop Recorder**:
+6. **Export Samples**:
+   - Click **Export Sample Zip** to download rendered WAV files for every key in the current mode
+   - In Scale Mode, the ZIP contains each note across the three keyboard rows
+7. **Use the Loop Recorder**:
    - Click **Record**, play on the keyboard, then click **Stop Recording**
    - Click **Play Loop** to start looping; **Stop Loop** to stop; **Clear Loop** to erase
    - Loops remember which mode, voice, and fade-out setting were used when they were recorded
@@ -57,6 +61,7 @@ C  D  E  F     G  A  B  C
 - **Audio Engine**: Web Audio API for audio decoding, pitch shifting, and mixing
 - **Pitch Shifting**: Uses playback rate manipulation (2^(semitones/12))
 - **Chords**: Each chord is built from the same sample using per-note playback rate and reduced per-note gain
+- **Sample Export**: Uses `OfflineAudioContext` to render each key to WAV, then packages the files with a dependency-free ZIP writer
 - **Master Limiter**: Global gain + `DynamicsCompressorNode` reduce clipping when many sources play at once
 - **Loop Recorder**: Captures key events with timestamps and replays them in a timed loop
 

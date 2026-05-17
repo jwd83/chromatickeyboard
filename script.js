@@ -14,6 +14,7 @@ let masterCompressor;
 // Current mode
 let currentMode = 'scale'; // 'scale' or 'chord'
 let fadeOutMode = true; // Whether to fade out previous notes when new ones play
+let isExportingSamples = false;
 
 // Track active audio sources for fade-out
 let activeSources = [];
@@ -28,6 +29,14 @@ const SCALE_MAP = {
     // Octave +1 (C5-C6)
     'q': 12, 'w': 14, 'e': 16, 'r': 17, 'u': 19, 'i': 21, 'o': 23, 'p': 24
 };
+
+const KEYBOARD_ROWS = {
+    high: { fileLabel: 'octave-up', keys: ['q', 'w', 'e', 'r', 'u', 'i', 'o', 'p'] },
+    mid: { fileLabel: 'root-octave', keys: ['a', 's', 'd', 'f', 'j', 'k', 'l', ';'] },
+    low: { fileLabel: 'octave-down', keys: ['z', 'x', 'c', 'v', 'm', ',', '.', '/'] }
+};
+
+const EXPORT_ROW_ORDER = ['low', 'mid', 'high'];
 
 // Chord mode: I-V-vi-IV progression (C major key)
 // Each chord is an array of semitone offsets
@@ -63,6 +72,13 @@ const CHORD_MAP = {
 
 // Note names for display
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const CHORD_NAMES = ['C', 'G', 'Am', 'F'];
+const FILE_KEY_NAMES = {
+    ',': 'comma',
+    '.': 'period',
+    '/': 'slash',
+    ';': 'semicolon'
+};
 
 // Track which keys are currently pressed
 const activeKeys = new Set();
@@ -84,6 +100,8 @@ const keyboardLow = document.getElementById('keyboard-low');
 const modeSelect = document.getElementById('mode-select');
 const fadeOutToggle = document.getElementById('fade-out-toggle');
 const voicesList = document.getElementById('voices-list');
+const exportSamplesBtn = document.getElementById('export-samples-btn');
+const exportStatus = document.getElementById('export-status');
 
 // Loop controls
 const loopRecordBtn = document.getElementById('loop-record-btn');
@@ -107,6 +125,11 @@ function init() {
     // Set up fade-out toggle
     fadeOutToggle.addEventListener('change', handleFadeOutToggle);
 
+    // Set up sample export
+    if (exportSamplesBtn) {
+        exportSamplesBtn.addEventListener('click', exportCurrentVoiceSamples);
+    }
+
     // Set up loop controls
     if (loopRecordBtn && loopStopRecordBtn && loopPlayBtn && loopStopBtn && loopClearBtn) {
         loopRecordBtn.addEventListener('click', startRecordingLoop);
@@ -124,6 +147,8 @@ function init() {
     // Set up keyboard event listeners
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+
+    updateExportControls();
 }
 
 // Handle mode change
@@ -142,6 +167,8 @@ function handleModeChange(event) {
         scaleInstructions.style.display = 'none';
         chordInstructions.style.display = 'block';
     }
+
+    updateExportControls();
 }
 
 // Handle fade-out toggle
@@ -150,6 +177,34 @@ function handleFadeOutToggle(event) {
 }
 
 // Voice management helpers
+function getCurrentVoice() {
+    return voices.find(voice => voice.id === currentVoiceId) || null;
+}
+
+function updateExportControls(statusText) {
+    if (!exportSamplesBtn && !exportStatus) return;
+
+    const currentVoice = getCurrentVoice();
+    if (exportSamplesBtn) {
+        exportSamplesBtn.disabled = isExportingSamples || !currentVoice;
+    }
+
+    if (!exportStatus) return;
+
+    if (statusText !== undefined) {
+        exportStatus.textContent = statusText;
+        return;
+    }
+
+    if (!currentVoice) {
+        exportStatus.textContent = 'Load a sound file to export samples.';
+        return;
+    }
+
+    const modeLabel = currentMode === 'scale' ? 'note' : 'chord';
+    exportStatus.textContent = `Ready to export ${modeLabel} samples from ${currentVoice.name}.`;
+}
+
 function renderVoices() {
     if (!voicesList) return;
 
@@ -160,6 +215,7 @@ function renderVoices() {
         empty.className = 'voices-empty';
         empty.textContent = 'No voices loaded. Use "Load Sound File" to add one or more sounds.';
         voicesList.appendChild(empty);
+        updateExportControls();
         return;
     }
 
@@ -175,6 +231,8 @@ function renderVoices() {
 
         voicesList.appendChild(item);
     });
+
+    updateExportControls();
 }
 
 function addVoice(name, buffer) {
@@ -351,9 +409,9 @@ function createVisualKeyboard() {
     keyboardLow.innerHTML = '';
     
     const keyboards = {
-        high: { element: keyboardHigh, keys: ['q', 'w', 'e', 'r', 'u', 'i', 'o', 'p'] },
-        mid: { element: keyboardMid, keys: ['a', 's', 'd', 'f', 'j', 'k', 'l', ';'] },
-        low: { element: keyboardLow, keys: ['z', 'x', 'c', 'v', 'm', ',', '.', '/'] }
+        high: { element: keyboardHigh, keys: KEYBOARD_ROWS.high.keys },
+        mid: { element: keyboardMid, keys: KEYBOARD_ROWS.mid.keys },
+        low: { element: keyboardLow, keys: KEYBOARD_ROWS.low.keys }
     };
     
     if (currentMode === 'scale') {
@@ -376,16 +434,13 @@ function createVisualKeyboard() {
             });
         });
     } else if (currentMode === 'chord') {
-        // Chord names for I-V-vi-IV progression
-        const chordNames = ['C', 'G', 'Am', 'F'];
-        
         Object.values(keyboards).forEach(keyboard => {
             keyboard.keys.forEach((key, index) => {
                 const keyElement = document.createElement('div');
                 keyElement.className = 'key';
                 keyElement.dataset.key = key;
                 
-                const chordName = chordNames[index % 4];
+                const chordName = CHORD_NAMES[index % 4];
                 
                 keyElement.innerHTML = `
                     <span class="key-label">${key.toUpperCase()}</span>
@@ -457,6 +512,335 @@ async function handleFileUpload(event) {
         console.error('Error loading audio file(s):', error);
         fileStatus.textContent = `Error loading file(s). Please try different audio files.`;
         fileStatus.style.color = '#f44336';
+    }
+}
+
+function getModeExportLabel(mode) {
+    return mode === 'scale' ? 'note' : 'chord';
+}
+
+function getNoteNameForOffset(semitoneOffset) {
+    const noteIndex = ((semitoneOffset % 12) + 12) % 12;
+    return NOTE_NAMES[noteIndex];
+}
+
+function getNoteLabelWithOctave(semitoneOffset) {
+    const octave = 4 + Math.floor(semitoneOffset / 12);
+    return `${getNoteNameForOffset(semitoneOffset)}${octave}`;
+}
+
+function getKeyFileLabel(key) {
+    return FILE_KEY_NAMES[key] || key.toLowerCase();
+}
+
+function sanitizeFileNamePart(value) {
+    return String(value)
+        .trim()
+        .replace(/#/g, 'sharp')
+        .replace(/[^a-z0-9._-]+/gi, '-')
+        .replace(/^-+|-+$/g, '')
+        .toLowerCase();
+}
+
+function getSampleBaseName(fileName) {
+    const withoutExtension = fileName.replace(/\.[^/.]+$/, '');
+    return sanitizeFileNamePart(withoutExtension) || 'sample';
+}
+
+function getExportEntriesForMode(mode) {
+    const entries = [];
+
+    EXPORT_ROW_ORDER.forEach(rowId => {
+        const row = KEYBOARD_ROWS[rowId];
+
+        row.keys.forEach((key, rowIndex) => {
+            const keyLabel = getKeyFileLabel(key);
+            const indexLabel = String(entries.length + 1).padStart(2, '0');
+
+            if (mode === 'scale') {
+                const semitoneOffset = SCALE_MAP[key];
+                const noteLabel = getNoteLabelWithOctave(semitoneOffset);
+                const fileNoteLabel = sanitizeFileNamePart(noteLabel);
+
+                entries.push({
+                    label: `${noteLabel} (${key.toUpperCase()})`,
+                    fileName: `${row.fileLabel}/${indexLabel}-${fileNoteLabel}-key-${keyLabel}.wav`,
+                    semitoneOffsets: [semitoneOffset],
+                    volumeScale: 1
+                });
+            } else {
+                const chordName = CHORD_NAMES[rowIndex % CHORD_NAMES.length];
+                const fileChordLabel = sanitizeFileNamePart(chordName);
+
+                entries.push({
+                    label: `${chordName} (${key.toUpperCase()})`,
+                    fileName: `${row.fileLabel}/${indexLabel}-${fileChordLabel}-key-${keyLabel}.wav`,
+                    semitoneOffsets: CHORD_MAP[key],
+                    volumeScale: 1 / CHORD_MAP[key].length
+                });
+            }
+        });
+    });
+
+    return entries;
+}
+
+async function renderSampleEntry(buffer, entry) {
+    const OfflineContext = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (!OfflineContext) {
+        throw new Error('Offline audio rendering is not supported in this browser.');
+    }
+
+    const renderDuration = Math.max(
+        ...entry.semitoneOffsets.map(offset => {
+            const playbackRate = Math.pow(2, offset / 12);
+            return buffer.duration / playbackRate;
+        })
+    );
+    const frameCount = Math.max(1, Math.ceil(renderDuration * buffer.sampleRate));
+    const offlineContext = new OfflineContext(buffer.numberOfChannels, frameCount, buffer.sampleRate);
+
+    entry.semitoneOffsets.forEach(offset => {
+        const source = offlineContext.createBufferSource();
+        source.buffer = buffer;
+        source.playbackRate.setValueAtTime(Math.pow(2, offset / 12), 0);
+
+        const gainNode = offlineContext.createGain();
+        gainNode.gain.setValueAtTime(entry.volumeScale, 0);
+
+        source.connect(gainNode);
+        gainNode.connect(offlineContext.destination);
+        source.start(0);
+    });
+
+    return offlineContext.startRendering();
+}
+
+function getAudioBufferPeak(buffer) {
+    let peak = 0;
+
+    for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+        const data = buffer.getChannelData(channel);
+
+        for (let index = 0; index < data.length; index++) {
+            peak = Math.max(peak, Math.abs(data[index]));
+        }
+    }
+
+    return peak;
+}
+
+function audioBufferToWav(buffer) {
+    const numberOfChannels = buffer.numberOfChannels;
+    const bytesPerSample = 2;
+    const blockAlign = numberOfChannels * bytesPerSample;
+    const dataSize = buffer.length * blockAlign;
+    const wavBuffer = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(wavBuffer);
+    const channelData = [];
+    const normalizationGain = 1 / Math.max(1, getAudioBufferPeak(buffer));
+
+    for (let channel = 0; channel < numberOfChannels; channel++) {
+        channelData.push(buffer.getChannelData(channel));
+    }
+
+    writeAsciiString(view, 0, 'RIFF');
+    view.setUint32(4, 36 + dataSize, true);
+    writeAsciiString(view, 8, 'WAVE');
+    writeAsciiString(view, 12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, numberOfChannels, true);
+    view.setUint32(24, buffer.sampleRate, true);
+    view.setUint32(28, buffer.sampleRate * blockAlign, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bytesPerSample * 8, true);
+    writeAsciiString(view, 36, 'data');
+    view.setUint32(40, dataSize, true);
+
+    let offset = 44;
+    for (let frame = 0; frame < buffer.length; frame++) {
+        for (let channel = 0; channel < numberOfChannels; channel++) {
+            const sample = Math.max(-1, Math.min(1, channelData[channel][frame] * normalizationGain));
+            const intSample = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+            view.setInt16(offset, intSample, true);
+            offset += bytesPerSample;
+        }
+    }
+
+    return wavBuffer;
+}
+
+function writeAsciiString(view, offset, value) {
+    for (let index = 0; index < value.length; index++) {
+        view.setUint8(offset + index, value.charCodeAt(index));
+    }
+}
+
+let crcTable = null;
+
+function getCrcTable() {
+    if (crcTable) return crcTable;
+
+    crcTable = new Uint32Array(256);
+    for (let index = 0; index < 256; index++) {
+        let value = index;
+
+        for (let bit = 0; bit < 8; bit++) {
+            value = (value & 1) ? (0xedb88320 ^ (value >>> 1)) : (value >>> 1);
+        }
+
+        crcTable[index] = value >>> 0;
+    }
+
+    return crcTable;
+}
+
+function calculateCrc32(data) {
+    const table = getCrcTable();
+    let crc = 0xffffffff;
+
+    for (let index = 0; index < data.length; index++) {
+        crc = table[(crc ^ data[index]) & 0xff] ^ (crc >>> 8);
+    }
+
+    return (crc ^ 0xffffffff) >>> 0;
+}
+
+function getDosDateTime(date) {
+    const year = Math.max(1980, date.getFullYear());
+
+    return {
+        time: (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2),
+        date: ((year - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate()
+    };
+}
+
+function createZipBlob(files) {
+    const encoder = new TextEncoder();
+    const now = getDosDateTime(new Date());
+    const parts = [];
+    const centralDirectoryParts = [];
+    let offset = 0;
+
+    files.forEach(file => {
+        const nameBytes = encoder.encode(file.name);
+        const data = file.data instanceof Uint8Array ? file.data : new Uint8Array(file.data);
+        const crc = calculateCrc32(data);
+
+        const localHeader = new ArrayBuffer(30 + nameBytes.length);
+        const localView = new DataView(localHeader);
+        localView.setUint32(0, 0x04034b50, true);
+        localView.setUint16(4, 20, true);
+        localView.setUint16(6, 0, true);
+        localView.setUint16(8, 0, true);
+        localView.setUint16(10, now.time, true);
+        localView.setUint16(12, now.date, true);
+        localView.setUint32(14, crc, true);
+        localView.setUint32(18, data.length, true);
+        localView.setUint32(22, data.length, true);
+        localView.setUint16(26, nameBytes.length, true);
+        localView.setUint16(28, 0, true);
+        new Uint8Array(localHeader, 30).set(nameBytes);
+
+        parts.push(localHeader, data);
+
+        const centralHeader = new ArrayBuffer(46 + nameBytes.length);
+        const centralView = new DataView(centralHeader);
+        centralView.setUint32(0, 0x02014b50, true);
+        centralView.setUint16(4, 20, true);
+        centralView.setUint16(6, 20, true);
+        centralView.setUint16(8, 0, true);
+        centralView.setUint16(10, 0, true);
+        centralView.setUint16(12, now.time, true);
+        centralView.setUint16(14, now.date, true);
+        centralView.setUint32(16, crc, true);
+        centralView.setUint32(20, data.length, true);
+        centralView.setUint32(24, data.length, true);
+        centralView.setUint16(28, nameBytes.length, true);
+        centralView.setUint16(30, 0, true);
+        centralView.setUint16(32, 0, true);
+        centralView.setUint16(34, 0, true);
+        centralView.setUint16(36, 0, true);
+        centralView.setUint32(38, 0, true);
+        centralView.setUint32(42, offset, true);
+        new Uint8Array(centralHeader, 46).set(nameBytes);
+
+        centralDirectoryParts.push(centralHeader);
+        offset += localHeader.byteLength + data.byteLength;
+    });
+
+    const centralDirectoryOffset = offset;
+    centralDirectoryParts.forEach(part => {
+        parts.push(part);
+        offset += part.byteLength;
+    });
+    const centralDirectorySize = offset - centralDirectoryOffset;
+
+    const endRecord = new ArrayBuffer(22);
+    const endView = new DataView(endRecord);
+    endView.setUint32(0, 0x06054b50, true);
+    endView.setUint16(4, 0, true);
+    endView.setUint16(6, 0, true);
+    endView.setUint16(8, files.length, true);
+    endView.setUint16(10, files.length, true);
+    endView.setUint32(12, centralDirectorySize, true);
+    endView.setUint32(16, centralDirectoryOffset, true);
+    endView.setUint16(20, 0, true);
+    parts.push(endRecord);
+
+    return new Blob(parts, { type: 'application/zip' });
+}
+
+function downloadBlob(blob, fileName) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function exportCurrentVoiceSamples() {
+    const currentVoice = getCurrentVoice();
+    if (!currentVoice || isExportingSamples) return;
+
+    const mode = currentMode;
+    const modeLabel = getModeExportLabel(mode);
+    const sampleBaseName = getSampleBaseName(currentVoice.name);
+    const zipRoot = `${sampleBaseName}-${modeLabel}-samples`;
+    const entries = getExportEntriesForMode(mode);
+    const zipFiles = [];
+    let finalStatus = '';
+
+    try {
+        isExportingSamples = true;
+
+        for (let index = 0; index < entries.length; index++) {
+            const entry = entries[index];
+            updateExportControls(`Rendering ${index + 1}/${entries.length}: ${entry.label}`);
+            await new Promise(resolve => setTimeout(resolve, 0));
+
+            const renderedBuffer = await renderSampleEntry(currentVoice.buffer, entry);
+            const wavBuffer = audioBufferToWav(renderedBuffer);
+            zipFiles.push({
+                name: `${zipRoot}/${entry.fileName}`,
+                data: new Uint8Array(wavBuffer)
+            });
+        }
+
+        updateExportControls('Building zip file...');
+        const zipBlob = createZipBlob(zipFiles);
+        downloadBlob(zipBlob, `${zipRoot}.zip`);
+        finalStatus = `Exported ${entries.length} ${modeLabel} samples.`;
+    } catch (error) {
+        console.error('Error exporting sample zip:', error);
+        finalStatus = 'Export failed. Try a shorter sound file or another browser.';
+    } finally {
+        isExportingSamples = false;
+        updateExportControls(finalStatus || undefined);
     }
 }
 
